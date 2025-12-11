@@ -153,6 +153,12 @@ image_build haskell ort/haskell "$HASKELL_STACK_VERSION" \
     --build-context "base=docker-image://${DOCKER_IMAGE_ROOT}/ort/base:latest" \
     "$@"
 
+# Mix SBoM (Elixir)
+image_build elixir ort/elixir "$MIX_SBOM_VERSION" \
+    --build-arg MIX_SBOM_VERSION="$MIX_SBOM_VERSION" \
+    --build-context "base=docker-image://${DOCKER_IMAGE_ROOT}/ort/base:latest" \
+    "$@"
+
 # Main runtime ORT image
 image_build run ort "$ORT_VERSION" \
     --build-arg ORT_VERSION="$ORT_VERSION" \
@@ -164,4 +170,5 @@ image_build run ort "$ORT_VERSION" \
     --build-context "dart=docker-image://${DOCKER_IMAGE_ROOT}/ort/dart:latest" \
     --build-context "haskell=docker-image://${DOCKER_IMAGE_ROOT}/ort/haskell:latest" \
     --build-context "scala=docker-image://${DOCKER_IMAGE_ROOT}/ort/scala:latest" \
+    --build-context "elixir=docker-image://${DOCKER_IMAGE_ROOT}/ort/elixir:latest" \
     "$@"

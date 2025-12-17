@@ -443,6 +443,26 @@ COPY --from=bazelbuild /opt/bazel /opt/bazel
 COPY --from=bazelbuild /opt/go/bin/buildozer /opt/go/bin/buildozer
 
 #------------------------------------------------------------------------
+# Erlang (Rebar3 SBoM wrapped in Bombom)
+FROM base AS rebar3_sbom_build
+
+ARG BOMBOM_VERSION
+
+ENV BOMBOM_HOME=/opt/bombom
+
+RUN mkdir -p $BOMBOM_HOME/bin \
+    && curl -L https://github.com/stritzinger/bombom/releases/download/${BOMBOM_VERSION}/bombom.bin -o $BOMBOM_HOME/bin/bombom.bin \
+    && curl -L "https://github.com/stritzinger/bombom/releases/download/${BOMBOM_VERSION}/bombom.bin.sha256" -o /tmp/bombom.bin.sha256 \
+    && cd $BOMBOM_HOME/bin \
+    && shasum -a 256 -c /tmp/bombom.bin.sha256 \
+    && rm /tmp/bombom.bin.sha256 \
+    && mv bombom.bin bombom \
+    && chmod a+x $BOMBOM_HOME/bin/bombom
+
+FROM scratch AS erlang
+COPY --from=rebar3_sbom_build /opt/bombom /opt/bombom
+
+#------------------------------------------------------------------------
 # ORT
 FROM base AS ortbuild
 
@@ -590,6 +610,11 @@ RUN curl -LOs https://github.com/amzn/askalono/releases/download/$ASKALONO_VERSI
     unzip askalono-Linux.zip -d /opt/askalono
 
 ENV PATH=$PATH:/opt/askalono
+
+# Erlang (Rebar3 SBoM wrapped in Bombom)
+ENV BOMBOM_HOME=/opt/bombom
+ENV PATH=$PATH:$BOMBOM_HOME/bin/bombom
+COPY --from=erlang --chown=$USER:$USER $BOMBOM_HOME $BOMBOM_HOME
 
 #------------------------------------------------------------------------
 # Runtime container with minimal selection of supported package managers pre-installed.

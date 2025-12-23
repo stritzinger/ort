@@ -443,6 +443,38 @@ COPY --from=bazelbuild /opt/bazel /opt/bazel
 COPY --from=bazelbuild /opt/go/bin/buildozer /opt/go/bin/buildozer
 
 #------------------------------------------------------------------------
+# Elixir (Mix SBoM)
+FROM base AS mix_sbom_build
+
+ARG MIX_SBOM_VERSION
+
+ENV MIX_SBOM_HOME=/opt/mix_sbom
+ENV GOBIN=/opt/go/bin
+
+# Install cosign via go install (includes Go module signature verification)
+COPY --from=gobuild /opt/go /opt/go
+RUN $GOBIN/go install github.com/sigstore/cosign/v2/cmd/cosign@latest && chmod a+x $GOBIN/cosign
+
+# Download mix_sbom binary and sigstore bundle, then verify with tag reference
+RUN mkdir -p $MIX_SBOM_HOME/bin \
+    && ARCH=$(arch | sed s/aarch64/ARM64/ | sed s/x86_64/X64/) \
+    && curl -L "https://github.com/erlef/mix_sbom/releases/download/v${MIX_SBOM_VERSION}/mix_sbom_Linux_${ARCH}" \
+       -o $MIX_SBOM_HOME/bin/mix_sbom \
+    && curl -L "https://github.com/erlef/mix_sbom/releases/download/v${MIX_SBOM_VERSION}/mix_sbom_Linux_${ARCH}.sigstore" \
+       -o /tmp/mix_sbom.sigstore \
+    && $GOBIN/cosign verify-blob \
+       --bundle /tmp/mix_sbom.sigstore \
+       --certificate-identity-regexp "^https://github.com/erlef/mix_sbom/.*@refs/tags/v${MIX_SBOM_VERSION}$" \
+       --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+       $MIX_SBOM_HOME/bin/mix_sbom \
+    && chmod a+x $MIX_SBOM_HOME/bin/mix_sbom \
+    && rm /tmp/mix_sbom.sigstore \
+    && $MIX_SBOM_HOME/bin/mix_sbom --version
+
+FROM scratch AS elixir
+COPY --from=mix_sbom_build /opt/mix_sbom /opt/mix_sbom
+
+#------------------------------------------------------------------------
 # ORT
 FROM base AS ortbuild
 
@@ -590,6 +622,11 @@ RUN curl -LOs https://github.com/amzn/askalono/releases/download/$ASKALONO_VERSI
     unzip askalono-Linux.zip -d /opt/askalono
 
 ENV PATH=$PATH:/opt/askalono
+
+# Elixir (Mix SBoM)
+ENV MIX_SBOM_HOME=/opt/mix_sbom
+ENV PATH=$PATH:$MIX_SBOM_HOME/bin
+COPY --from=elixir --chown=$USER:$USER $MIX_SBOM_HOME $MIX_SBOM_HOME
 
 #------------------------------------------------------------------------
 # Runtime container with minimal selection of supported package managers pre-installed.

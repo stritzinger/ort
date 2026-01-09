@@ -17,22 +17,19 @@
  * License-Filename: LICENSE
  */
 
-plugins {
-    // Apply precompiled plugins.
-    id("ort-plugin-conventions")
-}
+package org.ossreviewtoolkit.utils.cyclonedx
 
-dependencies {
-    api(projects.analyzer)
-    api(projects.model)
+import org.cyclonedx.model.Component
 
-    implementation(projects.downloader)
-    implementation(projects.utils.ortUtils)
-
-    implementation(libs.cyclonedx)
-
-    ksp(projects.analyzer)
-
-    funTestImplementation(testFixtures(projects.analyzer))
-}
-
+/**
+ * Internal representation of a dependency extracted from a CycloneDX SBOM.
+ *
+ * @property component The CycloneDX component containing package metadata.
+ * @property bomRef The unique reference identifier for this component in the SBOM.
+ * @property dependsOn List of bom-refs that this component depends on (direct dependencies).
+ */
+data class CycloneDxDependency(
+    val component: Component,
+    val bomRef: String,
+    val dependsOn: List<String>
+)
